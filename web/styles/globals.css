@@ -1,0 +1,22 @@
+/* Basic global styles used by the scaffold. Create more comprehensive theming later. */
+:root {
+  --brand: #6C5CE7;
+  --bg: #ffffff;
+  --muted: #6b7280;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
+  color: #111827;
+}
+
+input, button, select {
+  font-size: 14px;
+  padding: 8px;
+}
