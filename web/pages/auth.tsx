@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { registerSignalKeys } from '../lib/signal'
 
 export default function AuthPage() {
   const [username, setUsername] = useState('')
@@ -6,41 +7,51 @@ export default function AuthPage() {
 
   async function register() {
     setStatus('Generating key pair...')
-    // Simple placeholder key generation using ECDH P-256 for scaffold.
-    const keyPair = await window.crypto.subtle.generateKey(
-      { name: 'ECDH', namedCurve: 'P-256' },
-      true,
-      ['deriveKey']
-    )
 
-    const publicKeyRaw = await window.crypto.subtle.exportKey('raw', keyPair.publicKey)
-    const publicKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(publicKeyRaw)))
-
-    // Save private key in IndexedDB/localStorage in production use secure storage
-    const pk = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey)
-    const pkb64 = btoa(String.fromCharCode(...new Uint8Array(pk)))
-    localStorage.setItem('aether_private_key', pkb64)
-    localStorage.setItem('aether_username', username)
-
-    setStatus('Registering with server...')
+    // Simple ECDH public key registration (still used for compatibility),
+    // plus Signal key registration for proper E2EE.
     try {
+      // Generate a lightweight public key for server indexing (scaffold)
+      const keyPair = await window.crypto.subtle.generateKey(
+        { name: 'ECDH', namedCurve: 'P-256' },
+        true,
+        ['deriveKey']
+      )
+      const publicKeyRaw = await window.crypto.subtle.exportKey('raw', keyPair.publicKey)
+      const publicKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(publicKeyRaw)))
+
+      // Save private key locally for scaffold-only flows
+      const pk = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey)
+      const pkb64 = btoa(String.fromCharCode(...new Uint8Array(pk)))
+      localStorage.setItem('aether_private_key', pkb64)
+      localStorage.setItem('aether_username', username)
+
+      setStatus('Registering with server...')
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/register`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ username, publicKey: publicKeyBase64 })
       })
       if (!res.ok) throw new Error('register failed')
-      setStatus('Registered — go to chat')
+
+      setStatus('Registering Signal keys...')
+      const sig = await registerSignalKeys(username)
+      if (!sig.ok) throw new Error('Signal registration failed')
+
+      setStatus('Registered — redirecting to profile')
+      setTimeout(() => {
+        window.location.href = '/profile'
+      }, 800)
     } catch (e) {
       console.error(e)
-      setStatus('Registration failed — check server')
+      setStatus('Registration failed — check server or console')
     }
   }
 
   return (
     <main style={{ padding: 20, fontFamily: 'Inter, system-ui, sans-serif' }}>
       <h1>Aether — Sign in / Register</h1>
-      <p>Create a username and generate your keypair (private key stored locally).</p>
+      <p>Create a username and generate your keypair (private key stored locally for this scaffold).</p>
       <label>
         Username<br />
         <input value={username} onChange={(e) => setUsername(e.target.value)} />
@@ -50,7 +61,7 @@ export default function AuthPage() {
       </div>
       <p>{status}</p>
       <p style={{ marginTop: 20 }}>
-        This is a scaffold. Production apps must store private keys securely and use a vetted E2EE protocol like Signal.
+        This is a scaffold. Production apps must store private keys securely and use a vetted E2EE protocol like Signal. After registering you'll be able to create encrypted sessions with contacts and send E2EE messages.
       </p>
     </main>
   )
